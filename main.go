@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -23,15 +24,25 @@ func main() {
 		idHigh      = flag.Int("to", 1, "The last ID that should be searched in the URL - exclusive")
 		concurrency = flag.Int("concurrency", 1, "How many scrapers to run in parallel. (More scrapers are faster, but more prone to rate limiting or bandwith issues)")
 		outfile     = flag.String("output", "output.csv", "Filename to export the CSV results")
-		name        = flag.String("nameQuery", ".name", "JQuery-style query for the name element")
-		address     = flag.String("addressQuery", ".address", "JQuery-style query for the address element")
-		phone       = flag.String("phoneQuery", ".phone", "JQuery-style query for the phone element")
-		email       = flag.String("emailQuery", ".email", "JQuery-style query for the email element")
+		cols        = flag.String("columns", "", "QueryString of Column to Selector - ie: name=.name&address=.addr")
 	)
 	flag.Parse()
 
-	columns := []string{*name, *address, *phone, *email}
-	headers := []string{"name", "address", "phone", "email"}
+	if len(*cols) == 0 {
+		log.Fatal("columns is a mandatory parameter")
+	}
+
+	colsParsed, err := url.ParseQuery(*cols)
+	if err != nil {
+		log.Fatalf("Invalid columns param: %s. QueryString format expected", *cols)
+	}
+	columns := make([]string, 0, 5)
+	headers := make([]string, 0, 5)
+
+	for header, selectors := range colsParsed {
+		columns = append(columns, selectors[0])
+		headers = append(headers, header)
+	}
 	// url and id are added as the first two columns.
 	headers = append([]string{"url", "id"}, headers...)
 
@@ -66,7 +77,9 @@ func main() {
 					log.Printf("could not fetch %v: %v", t.url, err)
 					continue
 				}
-				results <- r
+				for _, itemResult := range r {
+					results <- itemResult
+				}
 			}
 		}()
 	}
@@ -76,7 +89,7 @@ func main() {
 	}
 }
 
-func fetch(url string, id int, queries []string) ([]string, error) {
+func fetch(url string, id int, queries []string) ([][]string, error) {
 	res, err := http.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("could not get %s: %v", url, err)
@@ -98,10 +111,26 @@ func fetch(url string, id int, queries []string) ([]string, error) {
 	}
 
 	// extract info we want.
-	r := []string{url, strconv.Itoa(id)}
-	for _, q := range queries {
-		r = append(r, strings.TrimSpace(doc.Find(q).Text()))
+	baseColumns := []string{url, strconv.Itoa(id)}
+
+	matchesResults := make([][]string, 0, 1)
+	for queryIndex, q := range queries {
+		matches := doc.Find(q)
+		matchesResults = append(matchesResults, make([]string, 0, matches.Length()))
+		matches.Each(func(i int, s *goquery.Selection) {
+			matchesResults[queryIndex] = append(matchesResults[queryIndex], strings.TrimSpace(s.Text()))
+		})
 	}
+
+	r := make([][]string, len(matchesResults[0]), len(matchesResults[0]))
+	for i := range matchesResults[0] {
+		r[i] = make([]string, len(matchesResults), len(matchesResults))
+		for j := range matchesResults {
+			r[i][j] = matchesResults[j][i]
+		}
+		r[i] = append(baseColumns, r[i]...)
+	}
+
 	return r, nil
 }
 

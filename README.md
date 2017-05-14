@@ -8,7 +8,7 @@ Thanks [Francesc](https://github.com/campoy) for featuring this repo in episode 
 
 ## Flags
 
-Flags are all optional, and are set with a single dash on the command line, e.g.
+Flags are all optional except `columns`, and are set with a single dash on the command line, e.g.
 
 ```
 iterscraper \
@@ -17,10 +17,6 @@ iterscraper \
 -to             10                  \
 -concurrency    10                  \
 -output         foo.csv             \
--nameQuery      ".name"             \
--addressQuery   ".address"          \
--phoneQuery     ".phone"            \
--emailQuery     ".email"            
 ```
 
 For an explanation of the options, type `iterscraper -help`
@@ -28,25 +24,23 @@ For an explanation of the options, type `iterscraper -help`
 General usage of iterscraper:
 
 ```
-  -addressQuery string
-        JQuery-style query for the address element (default ".address")
   -concurrency int
         How many scrapers to run in parallel. (More scrapers are faster, but more prone to rate limiting or bandwith issues) (default 1)
-  -emailQuery string
-        JQuery-style query for the email element (default ".email")
   -from int
         The first ID that should be searched in the URL - inclusive.
-  -nameQuery string
-        JQuery-style query for the name element (default ".name")
   -output string
         Filename to export the CSV results (default "output.csv")
-  -phoneQuery string
-        JQuery-style query for the phone element (default ".phone")
   -to int
         The last ID that should be searched in the URL - exclusive (default 1)
   -url string
         The URL you wish to scrape, containing "%d" where the id should be substituted (default "http://example.com/v/%d")
+  -columns string
+        QueryString mapping Column title to Selector - ie: "name=.name&address=#address-container span"
 ```
+
+## NOTE ABOUT SELECTORS
+
+If there are multiple matches for a given selector in the same page, it is expected that other selectors return same amount of matches. Useful for lists, tables, etc.
 
 ## URL Structure
 
